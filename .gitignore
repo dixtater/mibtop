@@ -1,0 +1,21 @@
+# CLion and CMake
+.idea/
+cmake-build-*/
+
+# Android NDK
+*.so
+*.apk
+*.dex
+*.class
+*.o
+*.obj
+*.log
+
+# General
+*.swp
+*.swo
+*.tmp
+*.bak
+*.zip
+*.tar.gz
+*.DS_Store
