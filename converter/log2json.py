@@ -1,20 +1,20 @@
+# Updated version of log2json.py to store all /proc/stat CPU fields per timestamp
 import sys
 import json
 import re
 from datetime import datetime
 
 def parse_cpu_line(line):
-    """Parses a 'cpu' or 'cpuN' line and returns usage."""
     parts = line.strip().split()
-    if len(parts) < 8:
-        return None, None
-    label = parts[0]
-    values = list(map(int, parts[1:8]))  # user, nice, system, idle, iowait, irq, softirq
-    usage = sum(values[:3])  # user + nice + system
-    return label, usage
+    label = parts[0]  # e.g. 'cpu' or 'cpu0'
+    values = list(map(int, parts[1:11]))  # user to guest_nice
+    keys = [
+        "user", "nice", "system", "idle", "iowait",
+        "irq", "softirq", "steal", "guest", "guest_nice"
+    ]
+    return label, dict(zip(keys, values))
 
 def parse_process_line(line):
-    """Parses a 'Process' line and returns PID, name, utime, stime."""
     match = re.match(r"Process (\d+): \d+ \((.+?)\)", line)
     if not match:
         return None
@@ -30,51 +30,60 @@ def parse_process_line(line):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python convert_log_to_json.py <logfile>")
+        print("Usage: python log2json.py <logfile> [output_prefix]")
         sys.exit(1)
 
     logfile = sys.argv[1]
-    total_cpu = []
-    per_core_cpu = {}
-    per_process_cpu = {}
+    output_prefix = sys.argv[2] if len(sys.argv) > 2 else "output"
+
+    cpu_total = []
+    cpu_cores = {}
+    cpu_processes = {}
 
     with open(logfile, 'r') as f:
         timestamp = None
         for line in f:
             if line.startswith("### Timestamp:"):
                 timestamp_str = line.replace("### Timestamp:", "").strip()
-                timestamp = datetime.strptime(timestamp_str, "%a %b %d %H:%M:%S %Y").isoformat()
-            elif line.startswith("cpu") and not line.startswith("cpu "):  # core lines
-                label, usage = parse_cpu_line(line)
-                if label and usage is not None and timestamp:
-                    per_core_cpu.setdefault(label, []).append({
-                        "time": timestamp,
-                        "usage": usage
-                    })
-            elif line.startswith("cpu ") and timestamp:  # total CPU line
-                label, usage = parse_cpu_line(line)
-                if usage is not None:
-                    total_cpu.append({"time": timestamp, "usage": usage})
-            elif line.startswith("Process") and timestamp:
+                try:
+                    timestamp = datetime.strptime(timestamp_str, "%a %b %d %H:%M:%S %Y").isoformat()
+                except ValueError:
+                    timestamp = None
+            elif line.startswith("cpu ") and timestamp:
+                label, values = parse_cpu_line(line)
+                values["time"] = timestamp
+                cpu_total.append(values)
+            elif line.startswith("cpu") and timestamp:  # cpu0, cpu1, ...
+                label, values = parse_cpu_line(line)
+                values["time"] = timestamp
+                cpu_cores.setdefault(label, []).append(values)
+            elif line.startswith("Process ") and timestamp:
                 parsed = parse_process_line(line)
                 if parsed:
                     pid, name, usage = parsed
                     key = f"{name} ({pid})"
-                    per_process_cpu.setdefault(key, []).append({
+                    cpu_processes.setdefault(key, []).append({
                         "time": timestamp,
-                        "usage": usage
+                        "usage_sum_utime_stime": usage
                     })
 
-    with open("cpu_total.json", "w") as f:
-        json.dump({"cpu_total": total_cpu}, f, indent=2)
+    with open(f"{output_prefix}_cpu_total.json", "w") as f:
+        json.dump({"cpu_total": cpu_total}, f, indent=2)
 
-    with open("cpu_cores.json", "w") as f:
-        json.dump(per_core_cpu, f, indent=2)
+    with open(f"{output_prefix}_cpu_cores.json", "w") as f:
+        json.dump(cpu_cores, f, indent=2)
 
-    with open("cpu_processes.json", "w") as f:
-        json.dump(per_process_cpu, f, indent=2)
+    with open(f"{output_prefix}_cpu_processes.json", "w") as f:
+        json.dump(cpu_processes, f, indent=2)
 
-    print("Generated: cpu_total.json, cpu_cores.json, cpu_processes.json")
+    with open(f"{output_prefix}_combined.json", "w") as f:
+        json.dump({
+            "cpu_total": cpu_total,
+            "cpu_cores": cpu_cores,
+            "cpu_processes": cpu_processes
+        }, f, indent=2)
+
+    print(f"Generated: {output_prefix}_cpu_total.json, _cpu_cores.json, _cpu_processes.json, _combined.json")
 
 if __name__ == "__main__":
     main()

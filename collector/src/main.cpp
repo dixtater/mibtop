@@ -14,17 +14,22 @@ void handle_signal(int signal) {
 }
 
 int main(int argc, char* argv[]) {
-    int cycleTime = 1;
+    int cycleTime = 1; // default: 1 second sampling
+    std::string logPath = "/data/local/tmp/mibtop_log.txt";
+
     if (argc > 1) {
         cycleTime = std::stoi(argv[1]);
+    }
+    if (argc > 2) {
+        logPath = argv[2];
     }
 
     std::signal(SIGINT, handle_signal);
     std::signal(SIGTERM, handle_signal);
 
-    std::ofstream logFile("/data/local/tmp/mibtop_log.txt", std::ios::out | std::ios::app);
+    std::ofstream logFile(logPath, std::ios::out | std::ios::app);
     if (!logFile.is_open()) {
-        std::cerr << "Failed to open log file\n";
+        std::cerr << "Failed to open log file: " << logPath << "\n";
         return 1;
     }
 

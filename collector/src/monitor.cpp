@@ -23,10 +23,11 @@ void log_cpu_usage(std::ofstream& logFile) {
 
     std::string line;
     while (std::getline(statFile, line)) {
-        if (line.compare(0, 3, "cpu") == 0) {
+        // Log only lines that begin with "cpu", including cpu0, cpu1, etc.
+        if (line.rfind("cpu", 0) == 0) {
             logFile << line << "\n";
         } else {
-            break;
+            break;  // Stop at the first non-cpu line to avoid unrelated entries
         }
     }
 }
@@ -69,4 +70,3 @@ void log_per_process_cpu(std::ofstream& logFile) {
     logFile << "Processes scanned: " << count << "\n";
     closedir(dir);
 }
-
