@@ -121,16 +121,8 @@ function computeProcessPercent(procData, cpuTotal) {
 }
 
 function renderProcessSelector(processData, cpuTotal) {
-  const container = document.getElementById("processCharts");
-  const canvas = document.createElement("canvas");
-  container.appendChild(canvas);
-  const ctx = canvas.getContext("2d");
-
-  const selector = document.createElement("select");
-  selector.multiple = true;
-  selector.size = 10;
-  selector.style.marginTop = "10px";
-  selector.style.marginLeft = "20px";
+  const ctx = document.getElementById("processChart").getContext("2d");
+  const selector = document.getElementById("processSelector");
 
   const labelSet = new Set();
   Object.values(processData).forEach((arr) =>
@@ -155,20 +147,7 @@ function renderProcessSelector(processData, cpuTotal) {
     selector.appendChild(option);
   });
 
-  container.appendChild(selector);
-
-  // Determine top 10 processes by cumulative usage
-  const topProcesses = Object.entries(processData)
-    .filter(([_, records]) => records.length >= 2)
-    .map(([name, records]) => {
-      const first = records[0].usage_sum_utime_stime;
-      const last = records[records.length - 1].usage_sum_utime_stime;
-      return { name, delta: last - first };
-    })
-    .sort((a, b) => b.delta - a.delta)
-    .slice(0, 10)
-    .map(proc => proc.name);
-
+  const topProcesses = sortedProcessNames.slice(0, 10);
   Array.from(selector.options).forEach(option => {
     if (topProcesses.includes(option.value)) {
       option.selected = true;
@@ -202,33 +181,64 @@ function renderProcessSelector(processData, cpuTotal) {
 }
 
 function renderProcessGroupPie(processData, cpuTotal) {
-  const container = document.getElementById("processCharts");
-  const pieCanvas = document.createElement("canvas");
-  container.appendChild(pieCanvas);
-  const ctx = pieCanvas.getContext("2d");
-
+  const ctx = document.getElementById("processPieChart").getContext("2d");
+  
   const processGroupMap = {
-    kernel: [/^k(threadd|softirqd|worker|swap|compact|huge|devtmpfs|helper|blockd|rcu|.*)/, /^migration/, /^watchdog/, /^idle$/],
-    android_system: [/^system_server$/, /^zygote/, /^logd$/, /^servicemanager$/, /^hwservicemanager$/, /^vndservicemanager$/, /^surfaceflinger$/, /^audioserver$/, /^cameraserver$/, /^mediaserver$/, /^inputflinger$/],
-    vendor_services: [/^vendor\./, /^hwcomposer$/, /^thermalserviced$/, /^power_hal$/, /^gatekeeperd$/],
-    networking: [/^netd$/, /^dnsmasq$/, /^ip6tables$/, /^iptables$/, /^wpa_supplicant$/],
-    user_apps: [/^u0_a/, /^com\./, /^org\./, /^eu\./],
+    kernel: [
+      /^k/,
+      /^irq\//,
+      /^rcu/,
+      /msm/,
+      /watchdog/,
+      /writeback/,
+      /bioset/,
+      /blockd/,
+      /sched/,
+      /kgsl/,
+      /thermal/,
+      /kworker/,
+      /jbd2/,
+      /ext4/
+    ],
+    android_system: [
+      /^system_server$/, /^zygote/, /^logd$/, /^servicemanager$/, /^hwservicemanager$/, /^vndservicemanager$/,
+      /^surfaceflinger$/, /^audioserver$/, /^cameraserver$/, /^mediaserver$/, /^inputflinger$/, /^wificond$/, /^lmkd$/
+    ],
+    vendor_services: [
+      /^vendor\./, /^hwcomposer$/, /^thermalserviced$/, /^power_hal$/, /^gatekeeperd$/, /adsprpcd/, /qseecomd/
+    ],
+    networking: [
+      /^netd$/, /^dnsmasq$/, /^ip6tables$/, /^iptables$/, /^wpa_supplicant$/, /wcnss_filter/, /wpa_supplicant/
+    ],
+    user_apps: [
+      /^u0_a/, /^com\./, /^org\./, /^eu\./, /termux/, /android/,
+      /gallery/, /contacts/, /settings/, /youtube/, /launcher/
+    ],
     unknown: [/.*/]
   };
+  
+  
+  
+  console.log("🧠 Group map in use:", processGroupMap);
+  
 
-  function classify(name) {
-    for (const group in processGroupMap) {
-      if (processGroupMap[group].some(regex => regex.test(name))) {
-        return group;
-      }
+function classify(name) {
+  const cleaned = name.replace(/\s+\(\d+\)$/, ""); // Strip " (PID)"
+  for (const group in processGroupMap) {
+    if (processGroupMap[group].some(regex => regex.test(cleaned))) {
+      console.log(`✅ ${cleaned} → ${group}`);
+      return group;
     }
-    return "unknown";
   }
+  console.warn(`❌ ${cleaned} → unknown`);
+  return "unknown";
+}
 
   const groupUsage = {};
 
   Object.entries(processData).forEach(([name, records]) => {
     if (records.length < 2) return;
+	console.log("✅ Classifying:", name);
     const group = classify(name);
     const usage = computeProcessPercent(records, cpuTotal);
     const avg = usage.reduce((a, b) => a + b, 0) / usage.length;

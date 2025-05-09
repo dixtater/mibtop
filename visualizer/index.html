@@ -6,28 +6,48 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    .chart-container { margin-bottom: 40px; }
-    canvas { max-width: 100%; height: 400px; }
+    h1, h2 { text-align: center; }
+    .chart-box {
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 2 / 1;
+      margin: 20px auto;
+    }
+    .selector-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+      .chart-canvas {
+      width: 100%;
+      max-width: 600px;
+      height: auto;
+      aspect-ratio: 2 / 1;
+    }
   </style>
 </head>
 <body>
   <h1>mibtop Dashboard</h1>
 
-  <div class="chart-container">
+  <div class="chart-box">
     <h2>Total CPU Usage</h2>
     <canvas id="totalCpuChart"></canvas>
   </div>
 
-  <div class="chart-container">
-    <h2>Per-Core CPU Usage</h2>
-    <div id="coreCharts"></div>
-  </div>
-
-  <div class="chart-container">
+    <div class="chart-box" style="display: flex; flex-direction: row; align-items: flex-start; gap: 20px;">
+  <div class="selector-box">
     <h2>Top 5 Processes (by total CPU)</h2>
-    <div id="processCharts"></div>
+    <select id="processSelector" multiple size="10"></select>
   </div>
+  <canvas id="processChart" class="chart-canvas"></canvas>
+</div>
 
   <script src="script.js"></script>
+  <div class="chart-box">
+    <h2>Process Group CPU Usage</h2>
+    <canvas id="processPieChart" class="chart-canvas"></canvas>
+  </div>
+
 </body>
 </html>
